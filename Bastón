@@ -1,0 +1,215 @@
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_HMC5883_U.h>
+#define TRIGGER_PINX 16  //sensor trigger superior
+#define ECHO_PINX    14 //sensor echo superior
+#define TRIGGER_PIN 10 //sensor trigger de en medio
+#define ECHO_PIN    9  //sensor echo de en medio
+#define TRIGGER_PIN2 8 //sensor trigger inferior
+#define ECHO_PIN2    7  //Sensor echo inferior
+#define BOTON 15  //switch para cambiar de modo
+#define MOTOR 6  //motor 1
+#define MOTOR2 5  //motor 2
+#define ALARMA 4  //alarma
+
+Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345); //variable para magnetometro
+
+long duracion, distancia, distanciaa;  //variables para sensor ultrasonico 
+
+ 
+
+long ultrasonicoA() //funcion ultrasonico superior
+{
+  long duracion, distancia, distanciaa;  //variables para la funcion
+  distancia=0; //valor inicial de la variable
+  for(int i=0; i<3; i++) //filtro para mediciones
+  {
+  digitalWrite(TRIGGER_PINX, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PINX, HIGH);   // genera el pulso de triger por 10ms
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER_PINX, LOW);
+
+    duracion = pulseIn(ECHO_PINX, HIGH);
+  distanciaa = (duracion/2) / 29;
+  distancia+=distanciaa;
+  delay(100);
+  }
+  distancia=distancia/3;
+  Serial.println(distancia);
+      
+  return distancia;
+}
+long ultrasonicoAb() //funcion ultrasonico inferior
+{
+  long duracion, distancia, distanciaa;   //variables para funcion
+  distancia=0; //valor inicial de la funcion
+  for(int i=0; i<3; i++) //filtro para las mediciones
+  {
+  digitalWrite(TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PIN, HIGH);   // genera el pulso de triger por 10ms
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER_PIN, LOW);
+
+    duracion = pulseIn(ECHO_PIN, HIGH);
+  distanciaa = (duracion/2) / 29;
+  distancia+=distanciaa;
+  delay(100);
+  }
+  distancia=distancia/3;
+  Serial.println(distancia);
+      
+  return distancia;
+}
+
+long ultrasonicoM() //funcion ultrasonico de en medio
+{
+  long duracion, distancia, distanciaa;  //variables para la funcion
+  distancia=0; //valor inicial de la funcion
+  for(int i=0; i<3; i++) //filtro para mediciones
+  {
+  digitalWrite(TRIGGER_PIN2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PIN2, HIGH);   // genera el pulso de triger por 10ms
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER_PIN2, LOW);
+
+    duracion = pulseIn(ECHO_PIN2, HIGH);
+  distanciaa = (duracion/2) / 29;
+  distancia+=distanciaa;
+  delay(100);
+  }
+  distancia=distancia/3;
+  Serial.println(distancia);
+      
+  return distancia;
+}
+
+
+void displaySensorDetails(void) //valores iniciales del magnetometro
+{
+  sensor_t sensor;
+  mag.getSensor(&sensor);
+  Serial.println("------------------------------------");
+  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
+  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
+  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
+  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" uT");
+  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" uT");
+  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" uT");  
+  Serial.println("------------------------------------");
+  Serial.println("");
+  delay(500);
+}
+void setup() {
+Serial.begin(9600);
+  Serial.println("HMC5883 Magnetometer Test"); Serial.println("");
+  
+  if(!mag.begin()) //iniclaiza sensor
+  {
+    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!"); //error detector
+    while(1);
+}
+  displaySensorDetails();
+  pinMode(ECHO_PINX, INPUT);  
+  pinMode(TRIGGER_PINX, OUTPUT);
+   pinMode(ECHO_PIN, INPUT);
+  pinMode(TRIGGER_PIN, OUTPUT);
+   pinMode(ECHO_PIN2, INPUT);     
+  pinMode(TRIGGER_PIN2, OUTPUT);
+  pinMode(ALARMA, OUTPUT);
+}
+
+void loop() {
+  int velocidad=0, velocidad2=0, Da, Dm, Dab; //variables para mediciones de ultrasonico
+ while(digitalRead(BOTON)==LOW)  //funcion de baston con sensores de distancia
+ { 
+  Dm=ultrasonicoM(); //da el valor a la variable con la funcion de ultrasonico de en medio
+  delay(10);
+  Dab=ultrasonicoAb(); //valor a variable con funcion del ultrasonico inferior
+  delay(10);
+  Da = ultrasonicoA(); //valor para superior
+  delay(10);
+  if(Dm<25) //si el valor es menor a 25 avisa encendiendo motores
+  {
+   analogWrite(MOTOR, 250); //enciende motor y da medicion
+      Dm=ultrasonicoM();
+      Serial.print("medio: "); Serial.println(Dm);
+  }
+  analogWrite(MOTOR,0); //Apaga motor
+ 
+ if(Dab>25) // si la medicion es mayor a 25 enciende alarma
+  {
+  digitalWrite(ALARMA,1);
+  }
+  else if(Dab<25) //apaga alarma con mecdiciones menores a 25
+  {
+  digitalWrite(ALARMA,0);
+  }
+
+  if(Da < 30) //enciende motor dependiendo del sensor superior
+  {
+       analogWrite(MOTOR, 250); //enciende motor y da medicion
+      Da=ultrasonicoA();
+      Serial.print("medio: "); Serial.println(Da);
+  }
+ else{
+  analogWrite(MOTOR2,0); //Apaga motor
+  analogWrite(MOTOR,0); //Apaga motor
+ }
+ analogWrite(MOTOR, 0);//apaga motor
+ 
+ }
+
+ //-------------------------------------------
+ 
+ while (digitalRead(BOTON)==HIGH) //funcion de brujula
+    {
+        //nuevo evento de sensor
+  sensors_event_t event; 
+  mag.getEvent(&event);
+ 
+  //Muestra valores del sensor
+  Serial.print("X: "); Serial.print(event.magnetic.x); Serial.print("  ");
+  Serial.print("Y: "); Serial.print(event.magnetic.y); Serial.print("  ");
+  Serial.print("Z: "); Serial.print(event.magnetic.z); Serial.print("  ");Serial.println("uT");
+
+  // Hold the module so that Z is pointing 'up' and you can measure the heading with x&y
+  // Calculate heading when the magnetometer is level, then correct for signs of axis.
+  float heading = atan2(event.magnetic.y, event.magnetic.x);
+  
+  // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
+  // Find yours here: http://www.magnetic-declination.com/
+  // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
+  // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
+  float declinationAngle = 0.22;
+  heading += declinationAngle;
+  
+  // Corrige mediciones inversas
+  if(heading < 0)
+    heading += 2*PI;
+    
+  // Check for wrap due to addition of declination.
+  if(heading > 2*PI)
+    heading -= 2*PI;
+   
+  // Convierte radianes a grados
+  float headingDegrees = heading * 180/M_PI; 
+  
+  Serial.print("Heading (degrees): "); Serial.println(headingDegrees);
+
+  //enciende motor si se encuentra en el norte
+ if ((headingDegrees >= 266 && headingDegrees <= 270) || (headingDegrees >= 271 && headingDegrees <= 278))  //266-278
+    {
+      analogWrite (MOTOR, 255);  
+    }
+    //apaga motor si no se encuentra en el norte
+    else
+    {
+      digitalWrite(MOTOR,0);
+    }
+
+  delay(500);
+    }
+}
